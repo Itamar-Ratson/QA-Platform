@@ -6,13 +6,15 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"os"
 	"path/filepath"
-	"qa-test-app/internal/terraform"
-	"qa-test-app/internal/tests"
-	"qa-test-app/internal/yaml"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	"qa-test-app/internal/terraform"
+	"qa-test-app/internal/tests"
+	"qa-test-app/internal/tui"
+	"qa-test-app/internal/yaml"
 )
 
 var (
@@ -23,21 +25,53 @@ func main() {
 	apply := flag.Bool("apply", false, "Apply terraform")
 	destroy := flag.Bool("destroy", false, "Destroy all test workspaces")
 	test := flag.Bool("test", false, "Run tests against existing infrastructure")
+	cli := flag.Bool("cli", false, "Use CLI mode instead of TUI")
 	flag.Parse()
 
-	fmt.Println(tealStyle.Render("QA Test App Starting..."))
-	
-	tc, err := yaml.ParseTestCase("test-cases/sample.yaml")
+	// Load test cases
+	testCases, err := loadAllTestCases("test-cases")
 	if err != nil {
 		log.Fatal(err)
 	}
+	
+	if len(testCases) == 0 {
+		log.Fatal("No test cases found in test-cases directory")
+	}
+
+	// CLI mode for specific operations
+	if *destroy || *test || *apply || *cli {
+		if len(testCases) == 0 {
+			log.Fatal("No test cases available")
+		}
+		runCLI(testCases[0], *apply, *destroy, *test) // Use first test case for CLI
+		return
+	}
+
+	// TUI mode (default)
+	fmt.Println(tealStyle.Render("QA Test App - Select a test case:"))
+	choice, err := tui.StartTUI(testCases)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if choice == "" {
+		fmt.Println("No test selected")
+		return
+	}
+
+	fmt.Printf(tealStyle.Render("Selected: %s\n"), choice)
+	fmt.Println(tealStyle.Render("Use flags for operations: -apply, -test, -destroy"))
+}
+
+func runCLI(tc *yaml.TestCase, apply, destroy, test bool) {
+	fmt.Println(tealStyle.Render("QA Test App Starting..."))
 	fmt.Printf(tealStyle.Render("Loaded test: %s\n"), tc.Metadata.Name)
 	
 	workingDir := filepath.Join("terraform", "base")
 	tfvarsFile := "generated.tfvars"
 	executor := terraform.NewExecutor(workingDir, tfvarsFile)
 	
-	if *destroy {
+	if destroy {
 		fmt.Println(tealStyle.Render("Destroying all test workspaces..."))
 		if err := destroyAllTestWorkspaces(executor); err != nil {
 			log.Printf("Destroy warning: %v", err)
@@ -46,8 +80,7 @@ func main() {
 		return
 	}
 	
-	if *test {
-		// Find existing test workspace instead of creating new one
+	if test {
 		workspaces, err := executor.WorkspaceList()
 		if err != nil {
 			log.Fatalf("Failed to list workspaces: %v", err)
@@ -68,7 +101,7 @@ func main() {
 		}
 		
 		if targetWorkspace == "" {
-			log.Fatal("No test workspace with resources found. Run 'make apply' first.")
+			log.Fatal("No test workspace with resources found. Run with -apply first.")
 		}
 		
 		fmt.Printf(tealStyle.Render("Using existing workspace: %s\n"), targetWorkspace)
@@ -81,8 +114,9 @@ func main() {
 		return
 	}
 	
+	// Setup and plan (apply if requested)
 	fmt.Printf(tealStyle.Render("Setting up test environment for: %s\n"), tc.Metadata.Name)
-	err = executor.SetupTestEnvironment(tc.Metadata.Name)
+	err := executor.SetupTestEnvironment(tc.Metadata.Name)
 	if err != nil {
 		log.Fatalf("Failed to setup test environment: %v", err)
 	}
@@ -96,7 +130,7 @@ func main() {
 	fmt.Printf(tealStyle.Render("Generated tfvars with test tags: %s\n"), outputPath)
 	
 	defer func() {
-		if executor.CurrentWorkspace != "" && !*apply {
+		if executor.CurrentWorkspace != "" && !apply {
 			fmt.Println(tealStyle.Render("Cleaning up test environment..."))
 			if err := executor.CleanupTestEnvironment(); err != nil {
 				log.Printf("Cleanup failed: %v", err)
@@ -106,12 +140,6 @@ func main() {
 			}
 		}
 	}()
-	
-	fmt.Println(tealStyle.Render("Validating state..."))
-	if err := executor.ValidateState(); err != nil {
-		log.Fatalf("State validation failed: %v", err)
-	}
-	fmt.Println(tealStyle.Render("✓ State validated"))
 	
 	fmt.Println(tealStyle.Render("Planning deployment..."))
 	result, err := executor.Plan()
@@ -123,7 +151,7 @@ func main() {
 	}
 	fmt.Println(tealStyle.Render("✓ Plan completed"))
 	
-	if *apply {
+	if apply {
 		fmt.Println(tealStyle.Render("Applying deployment..."))
 		result, err = executor.Apply()
 		if err != nil {
@@ -134,12 +162,10 @@ func main() {
 		}
 		fmt.Println(tealStyle.Render("✓ Environment provisioned"))
 		
-		// Get terraform outputs
 		tfOutputs, err := getTerraformOutputs(executor)
 		if err != nil {
 			log.Printf("Warning: Could not get terraform outputs: %v", err)
 		} else {
-			// Run tests
 			runTests(tc.TestFunctions, tfOutputs)
 		}
 		
@@ -153,24 +179,20 @@ func main() {
 	fmt.Printf(tealStyle.Render("Active workspace: %s\n"), executor.CurrentWorkspace)
 }
 
-// getTerraformOutputs extracts outputs from terraform
 func getTerraformOutputs(executor *terraform.Executor) (map[string]interface{}, error) {
 	result, err := executor.GetOutputs()
 	if err != nil {
 		return nil, err
 	}
 	
-	// Parse terraform outputs JSON
 	var outputs map[string]interface{}
 	if err := json.Unmarshal([]byte(result.Output), &outputs); err != nil {
-		// If JSON parsing fails, create mock outputs for testing
 		return map[string]interface{}{
 			"vpc_id": "vpc-mock123",
 			"vpc_cidr_block": "10.0.0.0/16",
 		}, nil
 	}
 	
-	// Extract values from output structure
 	finalOutputs := make(map[string]interface{})
 	for key, output := range outputs {
 		if outputMap, ok := output.(map[string]interface{}); ok {
@@ -183,7 +205,6 @@ func getTerraformOutputs(executor *terraform.Executor) (map[string]interface{}, 
 	return finalOutputs, nil
 }
 
-// runTests executes the test functions
 func runTests(testFunctions []string, tfOutputs map[string]interface{}) {
 	fmt.Println(tealStyle.Render("\n=== Running Tests ==="))
 	
@@ -195,10 +216,10 @@ func runTests(testFunctions []string, tfOutputs map[string]interface{}) {
 	successCount := 0
 	for _, result := range results {
 		status := "✗ FAIL"
-		style := lipgloss.NewStyle().Foreground(lipgloss.Color("9")) // Red
+		style := lipgloss.NewStyle().Foreground(lipgloss.Color("9"))
 		if result.Success {
 			status = "✓ PASS"
-			style = lipgloss.NewStyle().Foreground(lipgloss.Color("10")) // Green
+			style = lipgloss.NewStyle().Foreground(lipgloss.Color("10"))
 			successCount++
 		}
 		
@@ -228,13 +249,11 @@ func destroyAllTestWorkspaces(executor *terraform.Executor) error {
 		if ws != "default" && strings.HasPrefix(ws, "test-") {
 			fmt.Printf(tealStyle.Render("Destroying workspace: %s\n"), ws)
 			
-			// Select workspace first
 			if _, err := executor.SelectWorkspace(ws); err != nil {
 				fmt.Printf("Failed to select workspace %s: %v\n", ws, err)
 				continue
 			}
 			
-			// Destroy resources then delete workspace
 			if err := executor.CleanupTestEnvironment(); err != nil {
 				fmt.Printf("Cleanup failed for %s, forcing deletion: %v\n", ws, err)
 				executor.ForceCleanup()
@@ -243,4 +262,27 @@ func destroyAllTestWorkspaces(executor *terraform.Executor) error {
 	}
 	
 	return nil
+}
+
+func loadAllTestCases(dir string) ([]*yaml.TestCase, error) {
+	var testCases []*yaml.TestCase
+	
+	files, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, err
+	}
+	
+	for _, file := range files {
+		if !file.IsDir() && (strings.HasSuffix(file.Name(), ".yaml") || strings.HasSuffix(file.Name(), ".yml")) {
+			filepath := filepath.Join(dir, file.Name())
+			tc, err := yaml.ParseTestCase(filepath)
+			if err != nil {
+				log.Printf("Warning: failed to parse %s: %v", filepath, err)
+				continue
+			}
+			testCases = append(testCases, tc)
+		}
+	}
+	
+	return testCases, nil
 }

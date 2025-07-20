@@ -1,0 +1,20 @@
+metadata:
+  name: "Security Groups Test"
+  type: "security"
+  priority: "medium"
+  severity: "high"
+  expected_result: "Security groups properly configured"
+  description: "Test security group rules and access controls"
+
+terraform:
+  tfvars:
+    region: "eu-north-1"
+    vpc_cidr: "10.2.0.0/16"
+    private_subnets: ["10.2.1.0/24", "10.2.2.0/24"]
+    public_subnets: ["10.2.101.0/24", "10.2.102.0/24"]
+    availability_zones: ["eu-north-1a", "eu-north-1b"]
+    environment: "qa-security"
+
+test_functions:
+  - "validate_cidr_ranges"
+  - "test_subnet_connectivity"
