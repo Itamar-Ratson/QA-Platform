@@ -26,7 +26,15 @@ Go-based TUI app for QA testing that reads YAML test case metadata and Terraform
 - [ ] Add environment cleanup on test completion
 - [x] Implement resource tagging for test identification
 
-### 4. TUI Implementation
+### 4. Test Functions
+- [ ] Create test function interface
+- [ ] Implement CIDR range validation function
+- [ ] Implement DNS resolution test function
+- [ ] Add ping/connectivity tests against provisioned resources
+- [ ] Create test result reporting
+- [ ] Add AWS resource validation functions (EKS, VPC, etc.)
+
+### 5. TUI Implementation
 - [ ] Choose TUI library (bubbletea/tview)
 - [ ] Create main menu interface
 - [ ] Implement card-based layout for test cases
@@ -35,14 +43,6 @@ Go-based TUI app for QA testing that reads YAML test case metadata and Terraform
 - [ ] Implement navigation between cards
 - [ ] Add environment teardown buttons
 
-### 5. Test Functions
-- [ ] Create test function interface
-- [ ] Implement CIDR range validation function
-- [ ] Implement DNS resolution test function
-- [ ] Add ping/connectivity tests against provisioned resources
-- [ ] Create test result reporting
-- [ ] Add AWS resource validation functions (EKS, VPC, etc.)
-
 ### 5. TDD Implementation
 - [ ] Set up testing framework
 - [ ] Write unit tests for YAML parser
@@ -50,18 +50,18 @@ Go-based TUI app for QA testing that reads YAML test case metadata and Terraform
 - [ ] Write integration tests for TUI components
 - [ ] Add test coverage reporting
 
-### 6. DevOps Pipeline
+### 6. Containerization
+- [ ] Create Dockerfile for the app
+- [ ] Create docker-compose.yml for easy deployment
+- [ ] Add volume mounts for test configs
+- [ ] Optimize Docker image size
+
+### 7. DevOps Pipeline
 - [ ] Create GitHub Actions workflow
 - [ ] Add linting (golangci-lint)
 - [ ] Add automated testing
 - [ ] Add security scanning (gosec)
 - [ ] Add build and release automation
-
-### 7. Containerization
-- [ ] Create Dockerfile for the app
-- [ ] Create docker-compose.yml for easy deployment
-- [ ] Add volume mounts for test configs
-- [ ] Optimize Docker image size
 
 ### 8. Documentation
 - [ ] Add inline code documentation
