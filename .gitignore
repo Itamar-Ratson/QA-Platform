@@ -20,6 +20,7 @@ env/
 !ci-cd-project.png
 !Jenkinsfile
 !guide
+!go.mod
 
 # file types
 !*.sh
