@@ -24,14 +24,6 @@ func main() {
 	}
 	fmt.Printf("Loaded test: %s\n", tc.Metadata.Name)
 	
-	// Generate tfvars file
-	outputPath := filepath.Join("terraform", "base", "generated.tfvars")
-	err = terraform.GenerateTfvarsFile(tc.Terraform.TfVars, outputPath)
-	if err != nil {
-		log.Fatal(err)
-	}
-	fmt.Printf("Generated tfvars: %s\n", outputPath)
-	
 	// Create terraform executor
 	workingDir := filepath.Join("terraform", "base")
 	tfvarsFile := "generated.tfvars"
@@ -54,6 +46,14 @@ func main() {
 		log.Fatalf("Failed to setup test environment: %v", err)
 	}
 	fmt.Printf("✓ Test workspace created: %s\n", executor.CurrentWorkspace)
+	
+	// Generate tfvars file with test tags
+	outputPath := filepath.Join("terraform", "base", "generated.tfvars")
+	err = terraform.GenerateTfvarsFile(tc.Terraform.TfVars, tc.Metadata.Name, executor.CurrentWorkspace, outputPath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("Generated tfvars with test tags: %s\n", outputPath)
 	
 	// Ensure cleanup on exit
 	defer func() {

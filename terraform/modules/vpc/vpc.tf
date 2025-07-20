@@ -3,17 +3,15 @@ resource "aws_vpc" "main" {
   enable_dns_hostnames = true
   enable_dns_support   = true
 
-  tags = {
-    Name        = "${var.environment}-vpc"
-    Environment = var.environment
-  }
+  tags = merge(var.common_tags, {
+    Name = "${var.environment}-vpc"
+  })
 }
 
 resource "aws_internet_gateway" "main" {
   vpc_id = aws_vpc.main.id
 
-  tags = {
-    Name        = "${var.environment}-igw"
-    Environment = var.environment
-  }
+  tags = merge(var.common_tags, {
+    Name = "${var.environment}-igw"
+  })
 }

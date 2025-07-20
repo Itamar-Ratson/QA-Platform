@@ -6,11 +6,10 @@ resource "aws_subnet" "public" {
 
   map_public_ip_on_launch = true
 
-  tags = {
-    Name        = "${var.environment}-public-${count.index + 1}"
-    Environment = var.environment
-    Type        = "public"
-  }
+  tags = merge(var.common_tags, {
+    Name = "${var.environment}-public-${count.index + 1}"
+    Type = "public"
+  })
 }
 
 resource "aws_subnet" "private" {
@@ -19,9 +18,8 @@ resource "aws_subnet" "private" {
   cidr_block        = var.private_subnets[count.index]
   availability_zone = var.availability_zones[count.index]
 
-  tags = {
-    Name        = "${var.environment}-private-${count.index + 1}"
-    Environment = var.environment
-    Type        = "private"
-  }
+  tags = merge(var.common_tags, {
+    Name = "${var.environment}-private-${count.index + 1}"
+    Type = "private"
+  })
 }
