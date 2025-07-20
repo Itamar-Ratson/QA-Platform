@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"log"
 	"path/filepath"
@@ -9,6 +10,11 @@ import (
 )
 
 func main() {
+	// Parse flags
+	apply := flag.Bool("apply", false, "Apply terraform")
+	destroy := flag.Bool("destroy", false, "Destroy terraform")
+	flag.Parse()
+
 	fmt.Println("QA Test App Starting...")
 	
 	// Parse YAML test case
@@ -64,16 +70,33 @@ func main() {
 	}
 	fmt.Println("✓ Plan completed")
 	
+	// Handle apply flag
+	if *apply {
+		fmt.Println("Applying deployment...")
+		result, err = executor.Apply()
+		if err != nil {
+			log.Fatal(err)
+		}
+		if !result.Success {
+			log.Fatalf("Terraform apply failed: %s", result.Error)
+		}
+		fmt.Println("✓ Environment provisioned")
+		return
+	}
+	
+	// Handle destroy flag
+	if *destroy {
+		fmt.Println("Destroying deployment...")
+		result, err = executor.Destroy()
+		if err != nil {
+			log.Fatal(err)
+		}
+		if !result.Success {
+			log.Fatalf("Terraform destroy failed: %s", result.Error)
+		}
+		fmt.Println("✓ Environment destroyed")
+		return
+	}
+	
 	log.Println("Ready for development")
-
-	// Apply deployment
-	fmt.Println("Applying deployment...")
-	result, err = executor.Apply()
-	if err != nil {
-		log.Fatal(err)
-	}
-	if !result.Success {
-		log.Fatalf("Terraform apply failed: %s", result.Error)
-	}
-	fmt.Println("✓ Environment provisioned")	
 }
