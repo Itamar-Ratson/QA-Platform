@@ -21,6 +21,7 @@ env/
 !Jenkinsfile
 !guide
 !go.mod
+!go.sum
 
 # file types
 !*.sh

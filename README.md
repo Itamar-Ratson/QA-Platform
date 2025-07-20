@@ -7,14 +7,14 @@ Go-based TUI app for QA testing that reads YAML test case metadata and Terraform
 
 ### 1. Project Setup
 - [x] Initialize Go module (`go mod init qa-test-app`)
-- [ ] Set up basic project structure
+- [x] Set up basic project structure
 - [x] Create `.gitignore` for Go projects
 - [x] Add `README.md` with usage instructions
 
 ### 2. YAML Configuration
-- [ ] Define YAML schema for test cases with metadata + tfvars
-- [ ] Implement YAML parser for test metadata and Terraform variables
-- [ ] Create sample test case YAML files with embedded tfvars
+- [x] Define YAML schema for test cases with metadata + tfvars
+- [x] Implement YAML parser for test metadata and Terraform variables
+- [x] Create sample test case YAML files with embedded tfvars
 - [ ] Add validation for required fields (name, type, priority, severity, expected_result)
 - [ ] Validate Terraform variable structure
 
