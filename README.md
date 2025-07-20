@@ -27,10 +27,10 @@ Go-based TUI app for QA testing that reads YAML test case metadata and Terraform
 - [x] Implement resource tagging for test identification
 
 ### 4. Test Functions
-- [ ] Create test function interface
-- [ ] Implement CIDR range validation function
+- [x] Create test function interface
+- [x] Implement CIDR range validation function
 - [ ] Implement DNS resolution test function
-- [ ] Add ping/connectivity tests against provisioned resources
+- [x] Add ping/connectivity tests against provisioned resources
 - [ ] Create test result reporting
 - [ ] Add AWS resource validation functions (EKS, VPC, etc.)
 
