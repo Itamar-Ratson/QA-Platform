@@ -12,6 +12,9 @@ apply:
 destroy:
 	go run cmd/main.go -destroy
 
+test-workspace:
+	go run cmd/main.go -test
+
 test:
 	go test ./...
 

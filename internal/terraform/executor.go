@@ -265,3 +265,8 @@ func (e *Executor) SelectWorkspace(name string) (*ExecutionResult, error) {
 	
 	return e.runCommand("workspace", "new", name)
 }
+
+// GetOutputs returns terraform outputs as JSON
+func (e *Executor) GetOutputs() (*ExecutionResult, error) {
+	return e.runCommand("output", "-json")
+}
