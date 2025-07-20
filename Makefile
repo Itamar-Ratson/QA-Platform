@@ -4,7 +4,7 @@ build:
 	go build -o bin/qa-test-app cmd/main.go
 
 run:
-	go run cmd/main.go
+	go run cmd/main.go $(ARGS)
 
 test:
 	go test ./...

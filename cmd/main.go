@@ -65,32 +65,15 @@ func main() {
 	fmt.Println("✓ Plan completed")
 	
 	log.Println("Ready for development")
-	log.Println("Next: Run 'Apply()' to provision infrastructure")
-}
 
-// Example functions for TUI integration
-func provisionEnvironment(executor *terraform.Executor) error {
-	fmt.Println("Provisioning environment...")
-	result, err := executor.Apply()
+	// Apply deployment
+	fmt.Println("Applying deployment...")
+	result, err = executor.Apply()
 	if err != nil {
-		return err
+		log.Fatal(err)
 	}
 	if !result.Success {
-		return fmt.Errorf("apply failed: %s", result.Error)
+		log.Fatalf("Terraform apply failed: %s", result.Error)
 	}
-	fmt.Println("✓ Environment provisioned")
-	return nil
-}
-
-func destroyEnvironment(executor *terraform.Executor) error {
-	fmt.Println("Destroying environment...")
-	result, err := executor.Destroy()
-	if err != nil {
-		return err
-	}
-	if !result.Success {
-		return fmt.Errorf("destroy failed: %s", result.Error)
-	}
-	fmt.Println("✓ Environment destroyed")
-	return nil
+	fmt.Println("✓ Environment provisioned")	
 }
