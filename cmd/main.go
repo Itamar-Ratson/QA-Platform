@@ -12,7 +12,7 @@ import (
 func main() {
 	// Parse flags
 	apply := flag.Bool("apply", false, "Apply terraform")
-	destroy := flag.Bool("destroy", false, "Destroy terraform")
+	destroy := flag.Bool("destroy", false, "Destroy all test workspaces")
 	flag.Parse()
 
 	fmt.Println("QA Test App Starting...")
@@ -37,31 +37,47 @@ func main() {
 	tfvarsFile := "generated.tfvars"
 	executor := terraform.NewExecutor(workingDir, tfvarsFile)
 	
-	// Initialize terraform
-	fmt.Println("Initializing Terraform...")
-	result, err := executor.Init()
-	if err != nil {
-		log.Fatal(err)
+	// Handle destroy flag
+	if *destroy {
+		fmt.Println("Destroying all test workspaces...")
+		if err := destroyAllTestWorkspaces(executor); err != nil {
+			log.Printf("Destroy warning: %v", err)
+		}
+		fmt.Println("✓ All test workspaces destroyed")
+		return
 	}
-	if !result.Success {
-		log.Fatalf("Terraform init failed: %s", result.Error)
-	}
-	fmt.Println("✓ Terraform initialized")
 	
-	// Validate configuration
-	fmt.Println("Validating configuration...")
-	result, err = executor.Validate()
+	// Setup isolated test environment for apply/plan
+	fmt.Printf("Setting up test environment for: %s\n", tc.Metadata.Name)
+	err = executor.SetupTestEnvironment(tc.Metadata.Name)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("Failed to setup test environment: %v", err)
 	}
-	if !result.Success {
-		log.Fatalf("Configuration invalid: %s", result.Error)
+	fmt.Printf("✓ Test workspace created: %s\n", executor.CurrentWorkspace)
+	
+	// Ensure cleanup on exit
+	defer func() {
+		if executor.CurrentWorkspace != "" && !*apply {
+			fmt.Println("Cleaning up test environment...")
+			if err := executor.CleanupTestEnvironment(); err != nil {
+				log.Printf("Cleanup failed: %v", err)
+				executor.ForceCleanup()
+			} else {
+				fmt.Println("✓ Test environment cleaned up")
+			}
+		}
+	}()
+	
+	// Validate state
+	fmt.Println("Validating state...")
+	if err := executor.ValidateState(); err != nil {
+		log.Fatalf("State validation failed: %v", err)
 	}
-	fmt.Println("✓ Configuration valid")
+	fmt.Println("✓ State validated")
 	
 	// Plan deployment
 	fmt.Println("Planning deployment...")
-	result, err = executor.Plan()
+	result, err := executor.Plan()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -81,22 +97,32 @@ func main() {
 			log.Fatalf("Terraform apply failed: %s", result.Error)
 		}
 		fmt.Println("✓ Environment provisioned")
+		
+		// Show workspace info
+		info, _ := executor.GetWorkspaceInfo()
+		fmt.Printf("Workspace: %s (has resources: %v)\n", 
+			info["current_workspace"], info["has_resources"])
 		return
 	}
 	
-	// Handle destroy flag
-	if *destroy {
-		fmt.Println("Destroying deployment...")
-		result, err = executor.Destroy()
-		if err != nil {
-			log.Fatal(err)
-		}
-		if !result.Success {
-			log.Fatalf("Terraform destroy failed: %s", result.Error)
-		}
-		fmt.Println("✓ Environment destroyed")
-		return
+	fmt.Println("Ready for development")
+	fmt.Printf("Active workspace: %s\n", executor.CurrentWorkspace)
+}
+
+// destroyAllTestWorkspaces removes all test-* workspaces
+func destroyAllTestWorkspaces(executor *terraform.Executor) error {
+	workspaces, err := executor.WorkspaceList()
+	if err != nil {
+		return err
 	}
 	
-	log.Println("Ready for development")
+	for _, ws := range workspaces {
+		if ws != "default" && (ws[:5] == "test-" || ws[:4] == "test") {
+			fmt.Printf("Destroying workspace: %s\n", ws)
+			executor.CurrentWorkspace = ws
+			executor.ForceCleanup()
+		}
+	}
+	
+	return nil
 }

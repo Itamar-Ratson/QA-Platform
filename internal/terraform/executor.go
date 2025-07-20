@@ -5,11 +5,14 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 )
 
 type Executor struct {
-	WorkingDir string
-	TfvarsFile string
+	WorkingDir      string
+	TfvarsFile      string
+	CurrentWorkspace string
+	TestName        string
 }
 
 type ExecutionResult struct {
@@ -24,6 +27,124 @@ func NewExecutor(workingDir, tfvarsFile string) *Executor {
 		WorkingDir: workingDir,
 		TfvarsFile: tfvarsFile,
 	}
+}
+
+// SetupTestEnvironment creates isolated workspace for test
+func (e *Executor) SetupTestEnvironment(testName string) error {
+	e.TestName = testName
+	
+	// Create unique workspace name
+	timestamp := time.Now().Unix()
+	workspaceName := fmt.Sprintf("test-%s-%d", 
+		strings.ToLower(strings.ReplaceAll(testName, " ", "-")), 
+		timestamp)
+	
+	// Initialize if needed
+	if _, err := e.Init(); err != nil {
+		return fmt.Errorf("init failed: %w", err)
+	}
+	
+	// Create and select workspace
+	result, err := e.runCommand("workspace", "new", workspaceName)
+	if err != nil {
+		return fmt.Errorf("workspace creation failed: %w", err)
+	}
+	
+	if !result.Success {
+		return fmt.Errorf("workspace creation failed: %s", result.Error)
+	}
+	
+	e.CurrentWorkspace = workspaceName
+	return nil
+}
+
+// CleanupTestEnvironment destroys resources and removes workspace
+func (e *Executor) CleanupTestEnvironment() error {
+	if e.CurrentWorkspace == "" {
+		return fmt.Errorf("no active workspace to cleanup")
+	}
+	
+	// Destroy resources first
+	destroyResult, err := e.Destroy()
+	if err != nil || !destroyResult.Success {
+		return fmt.Errorf("destroy failed: %v, %s", err, destroyResult.Error)
+	}
+	
+	// Switch to default workspace
+	if _, err := e.runCommand("workspace", "select", "default"); err != nil {
+		return fmt.Errorf("failed to switch to default workspace: %w", err)
+	}
+	
+	// Delete test workspace
+	if _, err := e.runCommand("workspace", "delete", e.CurrentWorkspace); err != nil {
+		return fmt.Errorf("failed to delete workspace: %w", err)
+	}
+	
+	e.CurrentWorkspace = ""
+	return nil
+}
+
+// ValidateState checks if state is consistent
+func (e *Executor) ValidateState() error {
+	result, err := e.runCommand("validate")
+	if err != nil {
+		return fmt.Errorf("validation failed: %w", err)
+	}
+	
+	if !result.Success {
+		return fmt.Errorf("state validation failed: %s", result.Error)
+	}
+	
+	return nil
+}
+
+// HasResources checks if workspace has any resources
+func (e *Executor) HasResources() (bool, error) {
+	result, err := e.runCommand("state", "list")
+	if err != nil {
+		return false, err
+	}
+	
+	return strings.TrimSpace(result.Output) != "", nil
+}
+
+// ForceCleanup removes workspace even with resources (emergency cleanup)
+func (e *Executor) ForceCleanup() error {
+	if e.CurrentWorkspace == "" {
+		return nil
+	}
+	
+	// Try normal cleanup first
+	if err := e.CleanupTestEnvironment(); err == nil {
+		return nil
+	}
+	
+	// Force cleanup if normal cleanup fails
+	e.runCommand("workspace", "select", "default")
+	e.runCommand("workspace", "delete", "-force", e.CurrentWorkspace)
+	e.CurrentWorkspace = ""
+	
+	return nil
+}
+
+// GetWorkspaceInfo returns current workspace details
+func (e *Executor) GetWorkspaceInfo() (map[string]interface{}, error) {
+	info := map[string]interface{}{
+		"current_workspace": e.CurrentWorkspace,
+		"test_name":        e.TestName,
+		"working_dir":      e.WorkingDir,
+	}
+	
+	// Check if workspace has resources
+	hasResources, err := e.HasResources()
+	if err != nil {
+		info["has_resources"] = "unknown"
+		info["error"] = err.Error()
+	} else {
+		info["has_resources"] = hasResources
+	}
+	
+	return info, nil
 }
 
 // Init runs terraform init
@@ -50,11 +171,8 @@ func (e *Executor) Destroy() (*ExecutionResult, error) {
 func (e *Executor) runCommand(args ...string) (*ExecutionResult, error) {
 	cmd := exec.Command("terraform", args...)
 	cmd.Dir = e.WorkingDir
-	
-	// Set environment
 	cmd.Env = os.Environ()
 	
-	// Capture output
 	output, err := cmd.CombinedOutput()
 	
 	result := &ExecutionResult{
@@ -69,8 +187,6 @@ func (e *Executor) runCommand(args ...string) (*ExecutionResult, error) {
 	return result, nil
 }
 
-
-
 // GetState returns current terraform state info
 func (e *Executor) GetState() (map[string]interface{}, error) {
 	result, err := e.runCommand("show", "-json")
@@ -82,7 +198,6 @@ func (e *Executor) GetState() (map[string]interface{}, error) {
 		return nil, fmt.Errorf("terraform show failed: %s", result.Error)
 	}
 	
-	// Basic state info (extend as needed)
 	state := map[string]interface{}{
 		"has_resources": strings.Contains(result.Output, `"resources"`),
 		"output":       result.Output,
@@ -112,7 +227,6 @@ func (e *Executor) WorkspaceList() ([]string, error) {
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
 		if line != "" && !strings.Contains(line, "No workspaces") {
-			// Remove * prefix for current workspace
 			workspace := strings.TrimPrefix(line, "* ")
 			workspace = strings.TrimSpace(workspace)
 			if workspace != "" {
@@ -126,16 +240,15 @@ func (e *Executor) WorkspaceList() ([]string, error) {
 
 // SelectWorkspace selects or creates a workspace
 func (e *Executor) SelectWorkspace(name string) (*ExecutionResult, error) {
-	// Try to select existing workspace
 	result, err := e.runCommand("workspace", "select", name)
 	if err != nil {
 		return result, err
 	}
 	
 	if result.Success {
+		e.CurrentWorkspace = name
 		return result, nil
 	}
 	
-	// If selection failed, try to create new workspace
 	return e.runCommand("workspace", "new", name)
 }
