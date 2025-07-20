@@ -19,7 +19,7 @@ Go-based TUI app for QA testing that reads YAML test case metadata and Terraform
 - [ ] Validate Terraform variable structure
 
 ### 3. Terraform Integration
-- [ ] Create base Terraform modules for common AWS resources
+- [x] Create base Terraform modules for common AWS resources
 - [ ] Implement tfvars file generation from YAML
 - [ ] Add Terraform execution wrapper (init, plan, apply, destroy)
 - [ ] Handle Terraform state management
