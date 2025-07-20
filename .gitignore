@@ -37,3 +37,4 @@ env/
 !*.tf
 !*.go
 !*.odt
+!*.tfvars
