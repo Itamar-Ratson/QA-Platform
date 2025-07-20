@@ -1,7 +1,9 @@
 package terraform
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"strings"
@@ -167,17 +169,28 @@ func (e *Executor) Destroy() (*ExecutionResult, error) {
 	return e.runCommand("destroy", "-auto-approve", "-var-file="+e.TfvarsFile)
 }
 
-// runCommand executes terraform with given arguments
+// runCommand executes terraform with given arguments and streams output to terminal
 func (e *Executor) runCommand(args ...string) (*ExecutionResult, error) {
 	cmd := exec.Command("terraform", args...)
 	cmd.Dir = e.WorkingDir
 	cmd.Env = os.Environ()
 	
-	output, err := cmd.CombinedOutput()
+	// Create buffers to capture output
+	var outBuf, errBuf bytes.Buffer
+	
+	// Create multi-writers to stream to both terminal and buffer
+	cmd.Stdout = io.MultiWriter(os.Stdout, &outBuf)
+	cmd.Stderr = io.MultiWriter(os.Stderr, &errBuf)
+	
+	// Run command
+	err := cmd.Run()
+	
+	// Combine output
+	combinedOutput := outBuf.String() + errBuf.String()
 	
 	result := &ExecutionResult{
 		Success: err == nil,
-		Output:  string(output),
+		Output:  combinedOutput,
 	}
 	
 	if err != nil {
