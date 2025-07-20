@@ -24,7 +24,7 @@ Go-based TUI app for QA testing that reads YAML test case metadata and Terraform
 - [x] Add Terraform execution wrapper (init, plan, apply, destroy)
 - [x] Handle Terraform state management
 - [ ] Add environment cleanup on test completion
-- [ ] Implement resource tagging for test identification
+- [x] Implement resource tagging for test identification
 
 ### 4. TUI Implementation
 - [ ] Choose TUI library (bubbletea/tview)
